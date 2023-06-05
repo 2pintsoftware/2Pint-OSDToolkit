@@ -79,6 +79,8 @@ Foreach ($deploymentID in (Get-ChildItem -Path "$2PReg\BITSTS").PSChildName) {
     $Properties = [ordered]@{
       DeploymentID                  = $deploymentID
       PackageID                     = $PackageID
+      Step                          = ''
+      StepName                      = ''
       StartTime                     = ''
       EndTime                       = ''
       TotalDurationMin              = ''
@@ -88,6 +90,8 @@ Foreach ($deploymentID in (Get-ChildItem -Path "$2PReg\BITSTS").PSChildName) {
       Source                        = ''                               
       FilesTotal                    = ''                                                                                     
       FilesTransferred              = ''                                                                                           
+      SmallFilesCount               = ''
+      SmallFilesSize                = ''
       BytesTransferred              = ''                                                                                
       BytesTotal                    = ''                                                                                
       BytesFromSource               = ''                                                                                   
@@ -95,7 +99,7 @@ Foreach ($deploymentID in (Get-ChildItem -Path "$2PReg\BITSTS").PSChildName) {
       BytesTotalTurbo               = ''                                                                                 
       TurboDuration                 = ''                                                                                 
       TurboSpeed                    = ''
-      TurboFiles                    = ''                                                                                    
+      'TurboFiles (bytes - returncode)' = ''                                                                                    
       SequenceBytesFromSourceBefore = ''                                                                                      
       SequenceBytesFromPeersBefore  = ''                                                                                     
       SequenceBytesFromSource       = ''                                                                                 
@@ -103,19 +107,27 @@ Foreach ($deploymentID in (Get-ChildItem -Path "$2PReg\BITSTS").PSChildName) {
       ExitCode                      = '' 
     }
     
+    [array]$BTproperties = ((Get-ItemProperty -path "$2PReg\BITSTS\$($deploymentID)\$PackageID").PSObject.Properties | Where-Object { $_.Name -like "BytesTotal_*" }).Name
+    [array]$Turboproperties = ((Get-ItemProperty -path "$2PReg\BITSTS\$($deploymentID)\$PackageID").PSObject.Properties | Where-Object { $_.Name -like "TurboReturnCode_*" }).Name
+
     Foreach ($item in $items) {
-      $Properties."$item" = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name $item
+      if($Turboproperties -notcontains $item -and $BTproperties -notcontains $item)
+      {
+        $Properties."$item" = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name $item
+      }
+      
     }
     
-    [array]$BTproperties = ((Get-ItemProperty -path "$2PReg\BITSTS\$($deploymentID)\$PackageID").PSObject.Properties | Where-Object { $_.Name -like "BytesTotal_*" }).Name
+    
     if ($BTproperties) {
       $filenames = @()
       Foreach ($prop in $BTproperties) {
         $value = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name $prop
         $Name = ($prop -split "BytesTotal_")[1]
-        $filenames += "$Name ($value)"
+        try {$TurboRetCode =  Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name "TurboReturnCode_$Name" } catch {}
+        $filenames += "$Name ($value - $TurboRetCode)"
       }
-      $Properties.TurboFiles = $filenames -join ","
+      $Properties.'TurboFiles (bytes - returncode)' = $filenames -join ","
     }
     $Properties.TotalDurationMin = [math]::Round(([DateTime]$Properties.EndTime - [DateTime]$Properties.StartTime).TotalMinutes, 2)
     $deploymentList.Add((New-Object PsObject -Property $Properties))
