@@ -12,10 +12,11 @@
   Shows the result in a PowerShell GridView
 
 .NOTES
-  Version:        1.0
+  Version:        1.1
   Author:         2Pint Software
   Creation Date:  10/28/2022
   Purpose/Change: Initial script development
+  Updated:        07/28/2023
 
 .LINK
   https://2pintsoftware.com
@@ -63,6 +64,7 @@ if (-not (Test-Path $2PReg)) {
   exit
 }
 
+$ComputerName = $env:COMPUTERNAME
 $ResultList = $null
 $ResultList = [System.Collections.Generic.List[object]]::new()
 
@@ -77,6 +79,7 @@ Foreach ($deploymentID in (Get-ChildItem -Path "$2PReg\BITSTS").PSChildName) {
 
     $Properties = $null
     $Properties = [ordered]@{
+      ComputerName                  = $ComputerName
       DeploymentID                  = $deploymentID
       PackageID                     = $PackageID
       Step                          = ''
