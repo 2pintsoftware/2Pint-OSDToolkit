@@ -12,11 +12,12 @@
   Shows the result in a PowerShell GridView
 
 .NOTES
-  Version:        1.1
+  Version:        1.2
   Author:         2Pint Software
   Creation Date:  10/28/2022
   Purpose/Change: Initial script development
-  Updated:        07/28/2023
+  Updated:        08/22/2023
+  Supported BitsACP Client = 3.1.3.0+
 
 .LINK
   https://2pintsoftware.com
@@ -37,7 +38,9 @@ Param (
   [parameter(Mandatory = $false)]
   [string]$path,
   [parameter(Mandatory = $false)]   
-  [switch]$GridView
+  [switch]$GridView,
+  [parameter(Mandatory = $false)]   
+  [switch]$UTCtoLocalTime
 )
 #endregion -----------------------------------------------[Script Parameters]------------------------------------------------------
 #region --------------------------------------------------[Initialisations]--------------------------------------------------------
@@ -67,6 +70,10 @@ if (-not (Test-Path $2PReg)) {
 $ComputerName = $env:COMPUTERNAME
 $ResultList = $null
 $ResultList = [System.Collections.Generic.List[object]]::new()
+if ($UTCtoLocalTime) {
+  $UTCOffset = ([datetime]::Now - [DateTime]::UtcNow).Hours
+}
+
 
 Foreach ($deploymentID in (Get-ChildItem -Path "$2PReg\BITSTS").PSChildName) { 
 
@@ -79,70 +86,78 @@ Foreach ($deploymentID in (Get-ChildItem -Path "$2PReg\BITSTS").PSChildName) {
 
     $Properties = $null
     $Properties = [ordered]@{
-      ComputerName                  = $ComputerName
-      DeploymentID                  = $deploymentID
-      PackageID                     = $PackageID
-      Step                          = ''
-      StepName                      = ''
-      StartTime                     = ''
-      EndTime                       = ''
-      TotalDurationMin              = ''
-      TimetoNextMin                 = ''
-      StatusText                    = ''                                                                           
-      HttpStatus                    = ''                                                                                       
-      Source                        = ''                               
-      FilesTotal                    = ''                                                                                     
-      FilesTransferred              = ''                                                                                           
-      SmallFilesCount               = ''
-      SmallFilesSize                = ''
-      BytesTransferred              = ''                                                                                
-      BytesTotal                    = ''                                                                                
-      BytesFromSource               = ''                                                                                   
-      BytesFromPeers                = ''
-      BytesTotalTurbo               = ''                                                                                 
-      TurboDuration                 = ''                                                                                 
-      TurboSpeed                    = ''
+      ComputerName                      = $ComputerName
+      DeploymentID                      = $deploymentID
+      PackageID                         = $PackageID
+      Step                              = ''
+      StepName                          = ''
+      StartTime                         = ''
+      EndTime                           = ''
+      TotalDurationMin                  = ''
+      TimetoNextMin                     = ''
+      StatusText                        = ''                                                                           
+      HttpStatus                        = ''                                                                                       
+      Source                            = ''                               
+      FilesTotal                        = ''                                                                                     
+      FilesTransferred                  = ''                                                                                           
+      SmallFilesCount                   = ''
+      SmallFilesSize                    = ''
+      BytesTransferredBITS              = ''                                                                                
+      BytesTotal                        = ''                                                                                
+      BytesFromSource                   = ''                                                                                   
+      BytesFromPeers                    = ''
+      BytesTotalTurbo                   = ''                                                                                 
+      TurboDuration                     = ''                                                                                 
+      TurboSpeed                        = ''
       'TurboFiles (bytes - returncode)' = ''                                                                                    
-      SequenceBytesFromSourceBefore = ''                                                                                      
-      SequenceBytesFromPeersBefore  = ''                                                                                     
-      SequenceBytesFromSource       = ''                                                                                 
-      SequenceBytesFromPeers        = ''                                                                                   
-      ExitCode                      = '' 
+      SequenceBytesFromSourceBefore     = ''                                                                                      
+      SequenceBytesFromPeersBefore      = ''                                                                                     
+      SequenceBytesFromSource           = ''                                                                                 
+      SequenceBytesFromPeers            = ''                                                                                   
+      ExitCode                          = '' 
     }
     
     [array]$BTproperties = ((Get-ItemProperty -path "$2PReg\BITSTS\$($deploymentID)\$PackageID").PSObject.Properties | Where-Object { $_.Name -like "BytesTotal_*" }).Name
     [array]$Turboproperties = ((Get-ItemProperty -path "$2PReg\BITSTS\$($deploymentID)\$PackageID").PSObject.Properties | Where-Object { $_.Name -like "TurboReturnCode_*" }).Name
 
     Foreach ($item in $items) {
-      if($Turboproperties -notcontains $item -and $BTproperties -notcontains $item)
-      {
-        $Properties."$item" = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name $item
+      if ($Turboproperties -notcontains $item -and $BTproperties -notcontains $item) {
+        switch ($item) {
+          "BytesTransferred" { $Properties."BytesTransferredBITS" = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name $item }
+          Default {
+            $Properties."$item" = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name $item
+          }
+        }
       }
-      
     }
-    
     
     if ($BTproperties) {
       $filenames = @()
       Foreach ($prop in $BTproperties) {
         $value = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name $prop
         $Name = ($prop -split "BytesTotal_")[1]
-        try {$TurboRetCode =  Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name "TurboReturnCode_$Name" } catch {}
+        try { $TurboRetCode = Get-ItemPropertyValue -Path "$2PReg\BITSTS\$($deploymentID)\$PackageID" -Name "TurboReturnCode_$Name" } catch {}
         $filenames += "$Name ($value - $TurboRetCode)"
       }
       $Properties.'TurboFiles (bytes - returncode)' = $filenames -join ","
     }
     $Properties.TotalDurationMin = [math]::Round(([DateTime]$Properties.EndTime - [DateTime]$Properties.StartTime).TotalMinutes, 2)
+    if ($UTCtoLocalTime) {
+      $Properties.StartTime = "{0:yyyy-MM-dd HH:mm:ss}" -f ([DateTime]$Properties.StartTime).AddHours($UTCOffset)
+      $Properties.EndTime = "{0:yyyy-MM-dd HH:mm:ss}" -f ([DateTime]$Properties.EndTime).AddHours($UTCOffset)
+    } 
+
     $deploymentList.Add((New-Object PsObject -Property $Properties))
   }
 
   $sortedList = $deploymentList | Sort-Object -Property EndTime
   for ($i = 0; $i -lt ($sortedList.Count - 1); $i++) {
     $j = $i + 1
-    $sortedList[$i].TimetoNextMin = [math]::Round(([DateTime]$sortedList[$j].StartTime - [DateTime]$sortedList[$i].EndTime).TotalMinutes,2) 
+    $sortedList[$i].TimetoNextMin = [math]::Round(([DateTime]$sortedList[$j].StartTime - [DateTime]$sortedList[$i].EndTime).TotalMinutes, 2)
   }
+
   $ResultList += $deploymentList
 }
 
-if ($path) { $ResultList | Export-csv -path $path -Force -NoClobber -NoTypeInformation -Delimiter ";" }
-if ($GridView) { $ResultList | Out-GridView }
+if ($path) { $ResultList | Sort-Object -Property Step | Export-csv -path $path -Force -NoClobber -NoTypeInformation -Delimiter ";" }
+if ($GridView) { $ResultList | Sort-Object -Property Step | Out-GridView }
