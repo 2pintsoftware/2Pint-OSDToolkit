@@ -140,21 +140,21 @@ $OSDToolKitReadme = "For release changes please go to: https://docs.2pintsoftwar
 
 For documentation please go to: https://docs.2pintsoftware.com/osd-toolkit/
 	
-Note: 	The binaries in the Tools in this folder is aldready included in the WinPEGen.exe binary, 
-	but are available here here for your convinience when distributing to full OS machines. 
-	Please review the documentation for guidanace on that.
+Note: 	The binaries in the Tools folder are already included in the WinPEGen.exe binary, 
+	but are available here for your convenience when distributing to full OS machines. 
+	Please review the documentation for guidance on that.
 "
 
 $PatchesReadme = "Place the patch(es) you would like to apply to WinPE in this directory. Make sure they match the OS and architecture of the WinPE you are building."
-
 
 $StifleRSourceReadme = "Place the StifleR source directory in this folder if incorporating the StifleR client into the WinPE build."
 
 #endregion
 
-$StifleR = $true
+$StifleR = $false
 $BranchCache = $true
 $SkipOptionalComponents = $false
+$WinPEBuilderPath = 'C:\WinPEBuilder'
 
 # Check for elevation (admin rights)
 If ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
@@ -173,13 +173,15 @@ else
 
 #WinPEBuilder directory  - THIS IS WHERE EVERYTHING WILL BE BUILT.  Feel Free to customize, or it will use the folder based on where you saved the script.. which might not be the best, so plan ahead
 #AKA, create a folder c:\WinPEBuilder\ and save this script to that location, then run it.
-If ($psISE)
-{
-    $WinPEBuilderPath = Split-Path -Path $psISE.CurrentFile.FullPath        
-}
-else
-{
-    $WinPEBuilderPath = $global:PSScriptRoot
+if (!($WinPEBuilderPath)){
+    If ($psISE)
+    {
+        $WinPEBuilderPath = Split-Path -Path $psISE.CurrentFile.FullPath        
+    }
+    else
+    {
+        $WinPEBuilderPath = $global:PSScriptRoot
+    }
 }
 
 $ADKPaths = Get-AdkPaths -ErrorAction SilentlyContinue
@@ -263,7 +265,6 @@ else {$WimDownload = $true}
 #It will download the ESD File, then extract the indexes needed and create a a WIM to place into the correct WInPEBuilderPath Location
 
 if ($WimDownload -eq $true){
-
     #Check if previously downloaded and available
     if (Test-Path -Path "C:\OSDCloud\IPU\Media\$OSNameNeeded\sources\install.wim"){
         #Double check that there is no install.wim file there, if there isn't copy it there.
@@ -274,7 +275,7 @@ if ($WimDownload -eq $true){
     }
     else {
         #Get Windows that matches the ADK
-        New-OSDCloudOSWimFile -OSName $OSNameNeeded -OSEdition Pro -OSLanguage $Lang -OSActivation Retail
+        New-OSDCloudOSWimFile -OSName $OSNameNeeded -OSEdition Enterprise -OSLanguage $Lang -OSActivation Volume
         if (Test-Path -Path "C:\OSDCloud\IPU\Media\$OSNameNeeded\sources\install.wim"){
             Copy-Item "C:\OSDCloud\IPU\Media\$OSNameNeeded\sources\install.wim" -Destination "$WinPEBuilderPath\OSSource\$OSNameNeeded"
         }
@@ -283,7 +284,7 @@ if ($WimDownload -eq $true){
             break
         }
     }
-    #Grab Index Info for Pro to pass along later into 
+    #Grab Index Info for Enterprise to pass along later into 
     if (Test-Path -Path "$WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim"){
         $WinInfo = Get-WindowsImage -ImagePath "C:\OSDCloud\IPU\Media\$OSNameNeeded\sources\install.wim"
         $Index = ($WinInfo | Where-Object {$_.ImageName -eq "Windows 11 Enterprise"}).ImageIndex
@@ -295,8 +296,7 @@ if ($WimDownload -eq $true){
         Write-Host "Unable to get OSSourceIndex Info for Enterprise" -ForegroundColor Red
         break
         }
-    }
-    
+    } 
 }
 
 $Scratch = "$WinPEBuilderPath\Scratch"
@@ -305,8 +305,7 @@ $WinPEScratch = "$Scratch\winpe.wim"
 #Clean up Scratch directory
 If (Test-Path $Scratch) {
     Write-Host "Cleaning up previous run: $Scratch" -ForegroundColor DarkGray
-    Remove-Item $Scratch -Force -Verbose -Recurse | Out-Null
-    
+    Remove-Item $Scratch -Force -Verbose -Recurse | Out-Null   
 }
 Write-Host "Creating New Folder: $Scratch" -ForegroundColor DarkGray
 New-Item $Scratch -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
@@ -432,7 +431,6 @@ if ((Test-Path "$ADKPath\WinPE_OCs\WinPE-Scripting.cab") -and ($SkipOptionalComp
     #HTML (WinPE-HTA) Requires WinPE-Scripting
     Add-WindowsPackage -PackagePath "$ADKPath\WinPE_OCs\WinPE-HTA.cab" -Path $MountPath -Verbose
     Add-WindowsPackage -PackagePath "$ADKPath\WinPE_OCs\en-us\WinPE-HTA_en-us.cab" -Path $MountPath -Verbose
-
 }
 else {
     if (Test-Path "$ADKPath\WinPE_OCs\WinPE-Scripting.cab"){
