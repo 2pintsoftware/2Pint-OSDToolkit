@@ -1,4 +1,4 @@
-﻿<#
+<#
    .Synopsis
         WinPE Builder will generate a patched WinPE with Optional Components
         and also optionally add BranchCache and StifleR
@@ -18,8 +18,8 @@
    .NOTES
     AUTHOR: 2Pint Software
     EMAIL: support@2pintsoftware.com
-    VERSION: 23.10.01
-    DATE:10/01/2023 
+    VERSION: 25.01.29
+
     
     CHANGE LOG: 
     23.10.01  : Initial version of script 
@@ -27,6 +27,7 @@
     24.08.14  : GWB Version - Incorporate OSD Module (OSDCloud) to use to grab Windows directly from internet & also automate some folder directories
                   - YES, that means you need to install OSD Module - "Install Module -Name OSD"
     24.09.23  : Minor fixes and clean up
+    25.01.29  : Changed OS source media references from Pro to Enterprise
 
    .LINK
     https://2pintsoftware.com
@@ -43,8 +44,6 @@
 #Random Notes
 # ADK 24H2 doesn't patch well, last good patch = 2024-06 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5039239)
 #   - https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/a4531812-78f3-4028-8d1a-ea4381a49c48/public/windows11.0-kb5039239-x64_cd369cfc3ecd2e67c715dc28e563ca7ac1515f79.msu
-
-
 
 #region functions
 
@@ -134,7 +133,6 @@ function Get-AdkPaths {
 
 #endregion 
 
-
 #region Readme Files
 $BuildsReadme = "This is where WinPE builds will get staged once they are built."
 
@@ -157,7 +155,6 @@ $StifleRSourceReadme = "Place the StifleR source directory in this folder if inc
 $StifleR = $true
 $BranchCache = $true
 $SkipOptionalComponents = $false
-
 
 # Check for elevation (admin rights)
 If ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
@@ -199,7 +196,6 @@ Write-Host "$($ADKWinPEInfo.Version)" -ForegroundColor Green
 Write-Host "ADK WinPE Architecture:  " -ForegroundColor Cyan -NoNewline
 Write-Host "$($ADKWinPEInfo.ImageName)" -ForegroundColor Green
 
-
 $Mappings = @(
 
 @{ Build = '10.0.26100.1'; OSName = "Windows 11 24H2 x64"}  #Not supported by OSD Module Yet
@@ -238,25 +234,24 @@ if (!(Test-Path "$WinPEBuilderPath\StifleRSource\Readme.txt")){
     $StifleRSourceReadme | Out-File -FilePath "$WinPEBuilderPath\StifleRSource\Readme.txt" -Encoding utf8
 }
 
-
 #Check for Install.WIM, make sure one is already there, if not, it will try to download / build one for you
 if (Test-Path -Path "$WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim"){
     $WinInfo = Get-WindowsImage -ImagePath "$WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim"
-    $ProIndex = ($WinInfo | Where-Object {$_.ImageName -eq "Windows 11 Pro"}).ImageIndex
-    if ($ProIndex){
-        $ProIndexInfo = Get-WindowsImage -ImagePath "$WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim" -Index $ProIndex
+    $Index = ($WinInfo | Where-Object {$_.ImageName -eq "Windows 11 Enterprise"}).ImageIndex
+    if ($Index){
+        $IndexInfo = Get-WindowsImage -ImagePath "$WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim" -Index $Index
         #Confirm the Install WIM we have matches the ADK Version
         
-        if ($ProIndexInfo.Version -match  ($ADKWinPEInfo.Version).Replace(".1","")){
+        if ($IndexInfo.Version -match  ($ADKWinPEInfo.Version).Replace(".1","")){
             $WimDownload = $false
-            $ImageIndexNumber = $ProIndex
-            Write-Host "ADK Version: $($ADKWinPEInfo.Version) matches install.wim Version: $($ProIndexInfo.Version)" -ForegroundColor green
+            $ImageIndexNumber = $Index
+            Write-Host "ADK Version: $($ADKWinPEInfo.Version) matches install.wim Version: $($IndexInfo.Version)" -ForegroundColor green
         }
         else {
             $WimDownload = $true
             #Current install.wim file does not match ADK
             Write-Host "Removing $WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim" -ForegroundColor Yellow
-            Write-Host "ADK Version: $($ADKWinPEInfo.Version) vs install.wim Version: $($ProIndexInfo.Version)" -ForegroundColor Yellow
+            Write-Host "ADK Version: $($ADKWinPEInfo.Version) vs install.wim Version: $($IndexInfo.Version)" -ForegroundColor Yellow
             remove-item -path "$WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim" -Verbose
         }
     }
@@ -291,24 +286,18 @@ if ($WimDownload -eq $true){
     #Grab Index Info for Pro to pass along later into 
     if (Test-Path -Path "$WinPEBuilderPath\OSSource\$OSNameNeeded\install.wim"){
         $WinInfo = Get-WindowsImage -ImagePath "C:\OSDCloud\IPU\Media\$OSNameNeeded\sources\install.wim"
-        $ProIndex = ($WinInfo | Where-Object {$_.ImageName -eq "Windows 11 Pro"}).ImageIndex
-        if ($ProIndex){
+        $Index = ($WinInfo | Where-Object {$_.ImageName -eq "Windows 11 Enterprise"}).ImageIndex
+        if ($Index){
             $WimDownload = $false
-            $ImageIndexNumber = $ProIndex
+            $ImageIndexNumber = $Index
         }
         else {
-        Write-Host "Unable to get OSSourceIndex Info for Pro" -ForegroundColor Red
+        Write-Host "Unable to get OSSourceIndex Info for Enterprise" -ForegroundColor Red
         break
         }
     }
     
 }
-
-
-
-
-
-
 
 $Scratch = "$WinPEBuilderPath\Scratch"
 $WinPEScratch = "$Scratch\winpe.wim"
@@ -321,8 +310,6 @@ If (Test-Path $Scratch) {
 }
 Write-Host "Creating New Folder: $Scratch" -ForegroundColor DarkGray
 New-Item $Scratch -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
-
-
 
 # Set OS Image to get BranchCache binaries from. The OS version (build number, e.g. patch-level) must match boot image version.
 # If using a newer Windows 10 image, patch the boot media to same level
