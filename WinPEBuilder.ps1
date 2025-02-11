@@ -47,6 +47,12 @@
 # ADK 24H2 doesn't patch "normal", you have to install the Sept CU, which updates the SSU, then the current CU, so it adds some extra time.
 #   - windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu
 
+
+$StifleR = $false #Requires you grab the StifleR Client folder from a production client and place in the correct location (see further down)
+$BranchCache = $true
+$SkipOptionalComponents = $false
+$WinPEBuilderPath = 'C:\WinPEBuilder'
+
 #region functions
 
 <#
@@ -153,10 +159,7 @@ $StifleRSourceReadme = "Place the StifleR source directory in this folder if inc
 
 #endregion
 
-$StifleR = $false
-$BranchCache = $true
-$SkipOptionalComponents = $false
-$WinPEBuilderPath = 'C:\WinPEBuilder'
+
 
 # Check for elevation (admin rights)
 If ((New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
