@@ -25,9 +25,11 @@
     23.10.01  : Initial version of script 
     24.04.15  : Tax day version - updated build paths
     24.08.14  : GWB Version - Incorporate OSD Module (OSDCloud) to use to grab Windows directly from internet & also automate some folder directories
-                  - YES, that means you need to install OSD Module - "Install Module -Name OSD"
+                - YES, that means you need to install OSD Module - "Install Module -Name OSD"
     24.09.23  : Minor fixes and clean up
     25.01.29  : Changed OS source media references from Pro to Enterprise
+    25.02.11  : Modified to allow it to install more than one CU during the process (to deal with 24H2 ADK patching)
+    		- For 24H2, you need to install Sept 24 CU (windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu) first, then the current CU
 
    .LINK
     https://2pintsoftware.com
@@ -42,8 +44,8 @@
 #>
 
 #Random Notes
-# ADK 24H2 doesn't patch well, last good patch = 2024-06 Cumulative Update for Windows 11 Version 24H2 for x64-based Systems (KB5039239)
-#   - https://catalog.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/a4531812-78f3-4028-8d1a-ea4381a49c48/public/windows11.0-kb5039239-x64_cd369cfc3ecd2e67c715dc28e563ca7ac1515f79.msu
+# ADK 24H2 doesn't patch "normal", you have to install the Sept CU, which updates the SSU, then the current CU, so it adds some extra time.
+#   - windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu
 
 #region functions
 
