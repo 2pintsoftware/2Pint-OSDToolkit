@@ -445,18 +445,21 @@ If ($SSUPath) {Add-WindowsPackage -Path $MountPath -PackagePath $SSUPath -Verbos
 
 #Apply LCU
 $CU_MSU = Get-ChildItem -Path "$WinPEBuilderPath\Patches\CU\$OSNameNeeded" -Filter *.msu -ErrorAction SilentlyContinue
+
 if ($CU_MSU){
     if ($CU_MSU.count -gt 1){
-        $CU_MSU = $CU_MSU | Sort-Object -Property Name | Select-Object -Last 1
+        $CU_MSU = $CU_MSU | Sort-Object -Property Name #| Select-Object -Last 1
     }
-    $PatchPath = $CU_MSU.FullName
-    If ($PatchPath) {
-        Write-Host -ForegroundColor DarkGray "Applying CU $PatchPath"
-        Add-WindowsPackage -Path $MountPath -PackagePath $PatchPath -Verbose
+    foreach ($CU in $CU_MSU){
+        Write-Host -ForegroundColor Yellow "Found CU: $($CU.Name)"
+        $PatchPath = $CU.FullName
+        If ($PatchPath) {
+            $AvailableCU = $PatchPath
+            Write-Host -ForegroundColor Green "Available CU Found: $AvailableCU"
+            Write-Host -ForegroundColor DarkGray "Applying CU $PatchPath"
+            Add-WindowsPackage -Path $MountPath -PackagePath $PatchPath -Verbose
+        }
     }
-}
-else {
-    write-host "No CU's found to apply to OS $OSNameNeeded"
 }
 
 #Perform component cleanup
