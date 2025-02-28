@@ -30,6 +30,7 @@
     25.01.29  : Changed OS source media references from Pro to Enterprise
     25.02.11  : Modified to allow it to install more than one CU during the process (to deal with 24H2 ADK patching)
     		- For 24H2, you need to install Sept 24 CU (windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu) first, then the current CU
+    25.02.28  : Added option to add SMSTS.ini file to ExtraFiles\Windows folder
 
    .LINK
     https://2pintsoftware.com
@@ -46,12 +47,14 @@
 #Random Notes
 # ADK 24H2 doesn't patch "normal", you have to install the Sept CU, which updates the SSU, then the current CU, so it adds some extra time.
 #   - windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu
+#   - Interesting related thread: https://www.reddit.com/r/SCCM/comments/1izgi2r/troubles_applying_recent_cumulative_updates_to/
 
 
-$StifleR = $false #Requires you grab the StifleR Client folder from a production client and place in the correct location (see further down)
+$StifleR = $false #This Requires you grab the StifleR Client folder from a production client and place in the correct location (see further down)
 $BranchCache = $true
 $SkipOptionalComponents = $false
 $WinPEBuilderPath = 'C:\WinPEBuilder'
+$AddSMSTSiniFile = $true
 
 #region functions
 
@@ -142,6 +145,13 @@ function Get-AdkPaths {
 #endregion 
 
 #region Readme Files
+$SMSTSini = "[Logging]
+LOGLEVEL=1
+LOGMAXSIZE=5242880
+LOGMAXHISTORY=5
+DEBUGLOGGING=0
+"
+
 $BuildsReadme = "This is where WinPE builds will get staged once they are built."
 
 $OSDToolKitReadme = "For release changes please go to: https://docs.2pintsoftware.com/osd-toolkit/release-notes
@@ -227,7 +237,12 @@ try {
     [void][System.IO.Directory]::CreateDirectory("$WinPEBuilderPath\OSDToolkit") #Place OSDToolkit extract here
 }
 catch {throw}
-#Build Readme Files
+#Build  Files
+if ($AddSMSTSiniFile -eq $true){
+    if (!(Test-Path "$WinPEBuilderPath\ExtraFiles\Windows\smsts.ini")){
+        $SMSTSini | Out-File -FilePath "$WinPEBuilderPath\ExtraFiles\Windows\smsts.ini" -Encoding utf8
+    }
+}
 if (!(Test-Path "$WinPEBuilderPath\Builds\Readme.txt")){
     $BuildsReadme | Out-File -FilePath "$WinPEBuilderPath\Builds\Readme.txt" -Encoding utf8
 }
