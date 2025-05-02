@@ -22,4 +22,10 @@ Requires:
   - Add Background
   - Enable F8
   - etc
-  
+- Assign to Test OSD Task Sequence
+
+### Import Task Sequence Modules
+Import the latest available version of the export: TS Modules-2Pint Software OSD Toolkit %DATE%.zip
+
+Add the Modules 1-3 into the corrisponding sections of the task sequence.  The imported modules will have a lot of notes with it already
+[![Example](OSD Toolkit Task Sequence Step Locations.png)](OSD Toolkit Task Sequence Step Locations.png)
