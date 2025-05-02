@@ -27,5 +27,10 @@ Requires:
 ### Import Task Sequence Modules
 Import the latest available version of the export: TS Modules-2Pint Software OSD Toolkit %DATE%.zip
 
-Add the Modules 1-3 into the corrisponding sections of the task sequence.  The imported modules will have a lot of notes with it already
+Add the Module Phases 1-3 into the corrisponding sections of the task sequence.  The imported modules will have a lot of notes with it already
 [![Example](OSDToolkitTaskSequenceStepLocations.png)](OSDToolkitTaskSequenceStepLocations.png)
+
+Trigger the Task Sequence and watch that lovely P2P action.
+
+### DP Setup
+Make sure you enabled Branch Cache on your DPs!
