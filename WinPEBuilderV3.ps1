@@ -35,6 +35,7 @@ https://2pintsoftware.com
 WHAT YOU NEED TO DO
 Manage the script with some variables below, look for:
 - $StifleR = $true #this will add the content from your StifleRSource folder and enable that awesome 2Pint Magic
+  - For StifleR 3, when you want to use updated client, delete the extracted subfolder and replace the MSI
 - if you set it to false, you just get BC, which is still something.
 - $SkipOptionalComponents = $false #you'll typically want to leave this false unless you're doing some random testing
 - $WinPEBuilderPath = Path for where everything happens, this is set automatically based on where the script is running from
