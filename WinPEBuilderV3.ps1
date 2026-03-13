@@ -340,7 +340,9 @@ https://catalog.update.microsoft.com/Search.aspx?q=24H2%20cumulative
 "
 
 
-$StifleRSourceReadme = "Place the StifleR source directory in this folder if incorporating the StifleR client into the WinPE build."
+$StifleRSourceReadme210 = "Place the StifleR source directory in this folder if incorporating the StifleR client into the WinPE build."
+$StifleRSourceReadme30 = "Place the StifleR MSI in this folder if incorporating the StifleR client into the WinPE build.  Also copy your .2PSImport file here if you have one for your StifleR Client, this will get imported into the image during the build process."
+
 
 $WiFiSupportReadme = "Place the WiFi support files in this folder if incorporating WiFi support into the WinPE build.
     WiFiConnection.ps1 
@@ -423,6 +425,7 @@ $Lang = ($ADKWinPE.FullName | Split-Path) | Split-Path -Leaf
 
 if (Test-Path -path $WinPEBuilderPath){
     Write-Host "Using WinPEBuilder Path: $WinPEBuilderPath" -ForegroundColor Green
+    $FirstRun = $false
 }
 else {
     Write-Host "Creating WinPEBuilder Path: $WinPEBuilderPath" -ForegroundColor Green
@@ -469,10 +472,13 @@ if (!(Test-Path "$WinPEBuilderPath\OSDToolkit\Readme.txt")){
 if (!(Test-Path "$WinPEBuilderPath\Patches\Readme.txt")){
     $PatchesReadme | Out-File -FilePath "$WinPEBuilderPath\Patches\Readme.txt" -Encoding utf8
 }
-if (!(Test-Path "$WinPEBuilderPath\StifleRSource\Readme.txt")){
-    $StifleRSourceReadme | Out-File -FilePath "$WinPEBuilderPath\StifleRSource210\Readme.txt" -Encoding utf8
-    $StifleRSourceReadme | Out-File -FilePath "$WinPEBuilderPath\StifleRSource30\Readme.txt" -Encoding utf8
+if (!(Test-Path "$WinPEBuilderPath\StifleRSource210\Readme.txt")){
+    $StifleRSourceReadme210 | Out-File -FilePath "$WinPEBuilderPath\StifleRSource210\Readme.txt" -Encoding utf8
 }
+if (!(Test-Path "$WinPEBuilderPath\StifleRSource30\Readme.txt")){
+    $StifleRSourceReadme30 | Out-File -FilePath "$WinPEBuilderPath\StifleRSource30\Readme.txt" -Encoding utf8
+}
+
 if (!(Test-Path "$WinPEBuilderPath\WiFiSupport\Readme.txt")){
     $WiFiSupportReadme | Out-File -FilePath "$WinPEBuilderPath\WiFiSupport\Readme.txt" -Encoding utf8
 }
@@ -504,6 +510,32 @@ if ($FirstRun){
     write-host " - Place any extra files you want in the ExtraFiles folder, maintaining the folder structure as needed" -ForegroundColor Cyan
     write-host "+------------------------------------------------------------------------------------------------------+" -ForegroundColor Yellow
     break
+}
+
+#Check for StifleR 3 MSI & Config File
+if ($StifleR30 -eq $true){
+    $StiflerConfigJSON = (Get-ChildItem -Path "$WinPEBuilderPath\StifleRSource30" -Filter *.2psImport | Select-Object -First 1).FullName
+    if (!(Test-Path -path $StiflerConfigJSON)){
+        Write-Host "No .2PSImport file found in StifleRSource30 folder, skipping import of .2PSImport file" -ForegroundColor Yellow
+        Write-Host "If you have a .2PSImport file for your StifleR Client, place it in the StifleRSource30 folder to have it automatically imported into the image during the build process" -ForegroundColor Yellow
+        Write-Host "This Process will now exit until you have placed the .2PSImport file in the StifleRSource30 folder and re-run the script" -ForegroundColor Yellow
+        break
+    }
+    else {
+        $StiflerConfig = Get-Content -Path $StiflerConfigJSON -Raw
+        $StiflerConfigObject = $StiflerConfig | ConvertFrom-Json
+        $StifleRServer = $StiflerConfigObject.SettingsOptions.StiflerServers
+        Write-Host "Found .2PSImport file for StifleR Server: $StifleRServer" -ForegroundColor Green
+    }
+    $StifleR30MSI = (Get-ChildItem -Path "$WinPEBuilderPath\StifleRSource30" -Filter *.msi | Select-Object -First 1).FullName
+    if (!(Test-Path -path $StifleR30MSI)){
+        Write-Host "No StifleR 3 MSI found in StifleRSource30 folder, skipping incorporation of StifleR 3 Client" -ForegroundColor Yellow
+        write-Host "This Process will now exit until you have placed the StifleR 3 MSI in the StifleRSource30 folder and re-run the script" -ForegroundColor Yellow
+        break
+    }
+    else {
+        Write-Host "Found StifleR 3 MSI: $StifleR30MSI" -ForegroundColor Green
+    }
 }
 
 #Check for Install.WIM, make sure one is already there, if not, it will try to download / build one for you
