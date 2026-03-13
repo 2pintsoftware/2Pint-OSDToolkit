@@ -1330,7 +1330,7 @@ write-output "Build Number: $BuildNumber"
 
 
 #Export boot image to reduce the size
-If ($StifleR) {
+If ($StifleR210 -or $StifleR30) {
     Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath "$ExportPath\winpe.$($BuildNumber)_$(get-date -format "yy.MM.dd")_StifleR_$($FileSuffix).wim" -Verbose
 }
 Elseif ($BranchCache) {
