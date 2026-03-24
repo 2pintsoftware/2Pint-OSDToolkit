@@ -1492,11 +1492,11 @@ Else {
 }
 
 if ($Use2023BootLoaders){
-    Rename-Item $NewName -NewName $NewName.Replace(".wim","_2023.wim") -Verbose
+    Rename-Item "$ExportPath\$NewName" -NewName $NewName.Replace(".wim","_2023.wim") -Verbose
 }
 else
 {
-    Rename-Item $NewName -NewName $NewName.Replace(".wim","_2011.wim") -Verbose
+    Rename-Item "$ExportPath\$NewName" -NewName $NewName.Replace(".wim","_2011.wim") -Verbose
 }
 
 Pop-Location
