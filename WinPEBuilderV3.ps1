@@ -27,6 +27,8 @@ CHANGE LOG:
 25.12.19  : Added ability to choose StifleR 2.10 or 3.0 source folders
 25.12.20  : Added first run intelligence into the script to create folder structure if not present
 26.01.13  : Added Additional info around managing Certs
+26.03.24  : Added ability to use 2023 Bootloaders (for latest hardware support) or ADK Bootloaders (for better compatibility with older hardware)
+ - NOTE, if you use the latest version of 2PXE from 2Pint Software, you don't need to do this, 2PXE itself will figure out the correct bootloader and use it.  Pretty Nice!
 
 .LINK
 https://2pintsoftware.com
@@ -35,7 +37,7 @@ https://2pintsoftware.com
 WHAT YOU NEED TO DO
 Manage the script with some variables below, look for:
 - $StifleR = $true #this will add the content from your StifleRSource folder and enable that awesome 2Pint Magic
-  - For StifleR 3, when you want to use updated client, delete the extracted subfolder and replace the MSI
+- For StifleR 3, when you want to use updated client, delete the extracted subfolder and replace the MSI
 - if you set it to false, you just get BC, which is still something.
 - $SkipOptionalComponents = $false #you'll typically want to leave this false unless you're doing some random testing
 - $WinPEBuilderPath = Path for where everything happens, this is set automatically based on where the script is running from
@@ -69,7 +71,7 @@ $AddDellProvider = $false
 $AddHPCMSL = $false
 $Add7Zip = $false
 $AddOSDModule = $false
-
+$Use2023BootLoaders = $true
 
 
 
@@ -314,6 +316,85 @@ function Invoke-ExtractStiflerClientMSI {
         }
     }
 }
+function enable-privilege {
+    param(
+    ## The privilege to adjust. This set is taken from
+    ## http://msdn.microsoft.com/en-us/library/bb530716(VS.85).aspx
+    [ValidateSet(
+    "SeAssignPrimaryTokenPrivilege", "SeAuditPrivilege", "SeBackupPrivilege",
+    "SeChangeNotifyPrivilege", "SeCreateGlobalPrivilege", "SeCreatePagefilePrivilege",
+    "SeCreatePermanentPrivilege", "SeCreateSymbolicLinkPrivilege", "SeCreateTokenPrivilege",
+    "SeDebugPrivilege", "SeEnableDelegationPrivilege", "SeImpersonatePrivilege", "SeIncreaseBasePriorityPrivilege",
+    "SeIncreaseQuotaPrivilege", "SeIncreaseWorkingSetPrivilege", "SeLoadDriverPrivilege",
+    "SeLockMemoryPrivilege", "SeMachineAccountPrivilege", "SeManageVolumePrivilege",
+    "SeProfileSingleProcessPrivilege", "SeRelabelPrivilege", "SeRemoteShutdownPrivilege",
+    "SeRestorePrivilege", "SeSecurityPrivilege", "SeShutdownPrivilege", "SeSyncAgentPrivilege",
+    "SeSystemEnvironmentPrivilege", "SeSystemProfilePrivilege", "SeSystemtimePrivilege",
+    "SeTakeOwnershipPrivilege", "SeTcbPrivilege", "SeTimeZonePrivilege", "SeTrustedCredManAccessPrivilege",
+    "SeUndockPrivilege", "SeUnsolicitedInputPrivilege")]
+    $Privilege,
+    ## The process on which to adjust the privilege. Defaults to the current process.
+    $ProcessId = $pid,
+    ## Switch to disable the privilege, rather than enable it.
+    [Switch] $Disable
+    )
+    
+    ## Taken from P/Invoke.NET with minor adjustments.
+    $definition = @'
+ using System;
+ using System.Runtime.InteropServices;
+  
+ public class AdjPriv
+ {
+  [DllImport("advapi32.dll", ExactSpelling = true, SetLastError = true)]
+  internal static extern bool AdjustTokenPrivileges(IntPtr htok, bool disall,
+   ref TokPriv1Luid newst, int len, IntPtr prev, IntPtr relen);
+  
+  [DllImport("advapi32.dll", ExactSpelling = true, SetLastError = true)]
+  internal static extern bool OpenProcessToken(IntPtr h, int acc, ref IntPtr phtok);
+  [DllImport("advapi32.dll", SetLastError = true)]
+  internal static extern bool LookupPrivilegeValue(string host, string name, ref long pluid);
+  [StructLayout(LayoutKind.Sequential, Pack = 1)]
+  internal struct TokPriv1Luid
+  {
+   public int Count;
+   public long Luid;
+   public int Attr;
+  }
+  
+  internal const int SE_PRIVILEGE_ENABLED = 0x00000002;
+  internal const int SE_PRIVILEGE_DISABLED = 0x00000000;
+  internal const int TOKEN_QUERY = 0x00000008;
+  internal const int TOKEN_ADJUST_PRIVILEGES = 0x00000020;
+  public static bool EnablePrivilege(long processHandle, string privilege, bool disable)
+  {
+   bool retVal;
+   TokPriv1Luid tp;
+   IntPtr hproc = new IntPtr(processHandle);
+   IntPtr htok = IntPtr.Zero;
+   retVal = OpenProcessToken(hproc, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, ref htok);
+   tp.Count = 1;
+   tp.Luid = 0;
+   if(disable)
+   {
+    tp.Attr = SE_PRIVILEGE_DISABLED;
+   }
+   else
+   {
+    tp.Attr = SE_PRIVILEGE_ENABLED;
+   }
+   retVal = LookupPrivilegeValue(null, privilege, ref tp.Luid);
+   retVal = AdjustTokenPrivileges(htok, false, ref tp, 0, IntPtr.Zero, IntPtr.Zero);
+   return retVal;
+  }
+ }
+'@
+    
+    $processHandle = (Get-Process -id $ProcessId).Handle
+    $type = Add-Type $definition -PassThru
+    $type[0]::EnablePrivilege($processHandle, $Privilege, $Disable)
+}
+
 #endregion Functions
 
 
@@ -867,7 +948,7 @@ if ($FixWinRE) {
         Write-Host "Copying default wifi profile"
         Copy-Item -Path $DefaultWifiProfile -Destination "$MountPath\Windows\System32" -Force
     }
-
+    
     
     #DLLs needed to support wifi
     $DLLs = Get-ChildItem -Path $WifiFolder -Filter *.dll
@@ -896,8 +977,8 @@ if ($UseWinRE){$WinPESource = $WinRESource}
 # Get the StifleR Client files from a full Windows StifleR client install (copy entire folder)
 if ($StifleR210){
     $StifleRSource = "$WinPEBuilderPath\StifleRSource210"
-# Get the StifleR Client config file from a full Windows client 
-$StifleRClientRules = "$StifleRSource\StifleR.ClientApp.exe.Config"
+    # Get the StifleR Client config file from a full Windows client 
+    $StifleRClientRules = "$StifleRSource\StifleR.ClientApp.exe.Config"
 }
 #StifleR 3.0 requires the MSI file instead & the 2psimport file
 if ($StifleR30){
@@ -1012,10 +1093,10 @@ If ($StifleR30 -or $StifleR210) {
     }
     Elseif ($StifleR210) {
         Write-Output "Adding StifleR 2.1.0 Client to WinPE..."
-    .\WinPEGen.exe $OSSource $OSSourceIndex $WinPEScratch $WinPEIndex /Add-StifleR /StifleRConfig:$StifleRClientRules /StifleRSource:$StifleRSource
+        .\WinPEGen.exe $OSSource $OSSourceIndex $WinPEScratch $WinPEIndex /Add-StifleR /StifleRConfig:$StifleRClientRules /StifleRSource:$StifleRSource
     }
     
-
+    
 }
 Elseif ($BranchCache) {
     write-host ""
@@ -1186,7 +1267,7 @@ if ($CU_MSU){
             $AvailableCU = $PatchPath
             Write-Host -ForegroundColor DarkGray "Applying CU $PatchPath"
             try {
-            Add-WindowsPackage -Path $MountPath -PackagePath $PatchPath -Verbose
+                Add-WindowsPackage -Path $MountPath -PackagePath $PatchPath -Verbose
             }
             catch {
                 Write-Host "Failed to add CU Package" -ForegroundColor Red
@@ -1235,7 +1316,7 @@ If (Test-Path -Path $Drivers\*){
             & DISM /Image:$MountPath /Add-Driver /Driver:$DriverPath /Recurse /ForceUnsigned /LogPath:$WinPEBuilderPath\Drivers.log
         }
     }
-
+    
     
 }
 #Verify added packages
@@ -1253,7 +1334,7 @@ if ($Add7Zip -eq $true){
     # Example: https://github.com/ip7z/7zip/releases/download/24.07/7z2407-extra.7z
     $Download7zrURL = "https://github.com/ip7z/7zip/releases/download/$Version/7zr.exe"
     $DownloadURL ="https://github.com/ip7z/7zip/releases/download/$Version/$fileName"
-
+    
     Write-Host -ForegroundColor DarkGray "Downloading $DownloadURL"
     Invoke-WebRequest -Uri $Download7zrURL -OutFile "$env:TEMP\7zr.exe" -UseBasicParsing
     Invoke-WebRequest -Uri $DownloadURL -OutFile "$env:TEMP\$FileName" -UseBasicParsing
@@ -1317,6 +1398,58 @@ if (Get-Module -ListAvailable -Name OSD){
 #endregion
 
 
+### Replace Boot Loaders with 2023
+if ($Use2023BootLoaders -eq $true){
+    Write-Host -ForegroundColor Green "Taking Ownership and Granting Full Control of $MountPath\Windows\Boot"
+    enable-privilege SeTakeOwnershipPrivilege
+    $identity = New-Object System.Security.Principal.NTAccount("BUILTIN\Administrators")
+    # Get-Item for the Boot directory itself, plus Get-ChildItem for everything inside it
+    $items = @(Get-Item "$MountPath\Windows\Boot") + @(Get-ChildItem -Path "$MountPath\Windows\Boot" -Recurse)
+    foreach ($item in $items) {
+        # Take ownership
+        $acl = Get-Acl -Path $item.FullName
+        $acl.SetOwner($identity)
+        Set-Acl -Path $item.FullName -AclObject $acl
+        # Re-read ACL after ownership change, then grant Full Control
+        $acl = Get-Acl -Path $item.FullName
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, "FullControl", "Allow")
+        $acl.AddAccessRule($rule)
+        Set-Acl -Path $item.FullName -AclObject $acl
+    }
+    Write-Host -ForegroundColor Green "Ownership and permissions updated successfully"
+    
+    #Rename 2011 Signed Files to _2011
+    Rename-Item -Path "$MountPath\Windows\Boot\EFI" -NewName "EFI_2011" -Force -Verbose
+    Rename-Item -Path "$MountPath\Windows\Boot\Fonts" -NewName "Fonts_2011" -Force -Verbose
+    Rename-Item -Path "$MountPath\Windows\Boot\PXE" -NewName "PXE_2011" -Force -Verbose
+    
+    #Rename updated Signed Files to Default Values
+    
+    Rename-Item -Path "$MountPath\Windows\Boot\EFI_EX" -NewName "EFI" -Force -Verbose
+    Rename-Item -Path "$MountPath\Windows\Boot\Fonts_EX" -NewName "Fonts" -Force -Verbose
+    Rename-Item -Path "$MountPath\Windows\Boot\PXE_EX" -NewName "PXE" -Force -Verbose
+    
+    #Rename Child Files
+    
+    $EFIFiles = Get-Childitem -Path "$MountPath\Windows\Boot\EFI" -Filter *_EX*.* -Recurse
+    foreach ($File in $EFIFiles){
+        $NewName = $File.Name.Replace("_EX","")
+        Rename-Item -Path $File.FullName -NewName $NewName  -Verbose
+    }
+    
+    $FontFiles = Get-Childitem -Path "$MountPath\Windows\Boot\Fonts" -Filter *_EX*.* -Recurse
+    foreach ($File in $FontFiles){
+        $NewName = $File.Name.Replace("_EX","")
+        Rename-Item -Path $File.FullName -NewName $NewName  -Verbose
+    }
+    
+    $PXEFiles = Get-Childitem -Path "$MountPath\Windows\Boot\PXE" -Filter *_EX*.* -Recurse
+    foreach ($File in $PXEFiles){
+        $NewName = $File.Name.Replace("_EX","")
+        Rename-Item -Path $File.FullName -NewName $NewName  -Verbose
+    }
+}
+
 
 #Unmount boot image
 Write-Host -ForegroundColor DarkGray "========================================================================="
@@ -1330,14 +1463,41 @@ write-output "Build Number: $BuildNumber"
 
 
 #Export boot image to reduce the size
+$DateStamp = Get-Date -Format "yy.MM.dd"
+$DestinationPath = "$ExportPath\winpe.$($BuildNumber)_$DateStamp.wim"
+Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath $DestinationPath -Verbose
 If ($StifleR210 -or $StifleR30) {
-    Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath "$ExportPath\winpe.$($BuildNumber)_$(get-date -format "yy.MM.dd")_StifleR_$($FileSuffix).wim" -Verbose
+    Write-Host "Updateing file name to include StifleR Client"
+    if ($StifleR210){
+        $NewName = "winpe.$($BuildNumber)_$($DateStamp)_StifleR210_$($FileSuffix).wim"
+        Rename-Item $DestinationPath -NewName $NewName -Verbose
+    }
+    if ($StifleR30){    
+        $NewName = "winpe.$($BuildNumber)_$($DateStamp)_StifleR30_$($FileSuffix).wim"
+        Rename-Item $DestinationPath -NewName $NewName -Verbose
+    }
+    #Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath "$ExportPath\winpe.$($BuildNumber)_$DateStamp_StifleR_$($FileSuffix).wim" -Verbose
 }
 Elseif ($BranchCache) {
-    Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath "$ExportPath\winpe.$($BuildNumber)_$(get-date -format "yy.MM.dd")_BC_$($FileSuffix).wim" -Verbose
+    Write-Host "Updateing file name to include BranchCache"
+    $NewName = "winpe.$($BuildNumber)_$($DateStamp)_BranchCache_$($FileSuffix).wim"
+    Rename-Item $DestinationPath -NewName $NewName -Verbose
+    #Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath "$ExportPath\winpe.$($BuildNumber)_$DateStamp_BC_$($FileSuffix).wim" -Verbose
 }
 Else {
-    Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath "$ExportPath\winpe.$($BuildNumber)_$(get-date -format "yy.MM.dd")_$($FileSuffix).wim" -Verbose
+    Write-Host "No additional features added, keeping default file name"
+    $NewName = "winpe.$($BuildNumber)_$($DateStamp)_$($FileSuffix).wim"
+    Rename-Item $DestinationPath -NewName $NewName -Verbose
+    #Export-WindowsImage -SourceImagePath $WinPEScratch -SourceIndex 1 -DestinationImagePath "$ExportPath\winpe.$($BuildNumber)_$DateStamp_$($FileSuffix).wim" -Verbose
 }
+
+if ($Use2023BootLoaders){
+    Rename-Item $NewName -NewName $NewName.Replace(".wim","_2023.wim") -Verbose
+}
+else
+{
+    Rename-Item $NewName -NewName $NewName.Replace(".wim","_2011.wim") -Verbose
+}
+
 Pop-Location
 #>
