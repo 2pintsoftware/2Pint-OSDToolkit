@@ -71,7 +71,7 @@ $AddDellProvider = $false
 $AddHPCMSL = $false
 $Add7Zip = $false
 $AddOSDModule = $false
-$Use2023BootLoaders = $true
+$Use2023BootLoaders = $false
 
 
 
