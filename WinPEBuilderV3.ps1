@@ -46,6 +46,7 @@ Manage the script with some variables below, look for:
 <#Random Notes
 ADK 24H2 requires a hop step to patch... 
 If you got to the MS Catalog and look for the latest Windows 11 24H2 Cumulative Update, when you click on Download, you will see there are 2 files, windows11.0-kb5043080-x64, which is an older CU, and the newest one
+[DO NOT USE THE LATEST CU, anything after .7627 (Jan 17 2026) CU, Microsoft Breaks Branch Cache in the WinPE Process.]
 You will need to download the older one, and then download the newer one, and then use the older one to patch the WinPE, then use the newer one to patch the OS.
 This script will automatically install anything in that CU folder based on the name, so oldest CU to newest.  I keep the KB5043080 in that folder, and replace the other CU with the monthly released CU.
 So moral of the story, when you see multiple things in that Download Dialog, grab all of the, and place in the CU folder.
