@@ -29,6 +29,7 @@ CHANGE LOG:
 26.01.13  : Added Additional info around managing Certs
 26.03.24  : Added ability to use 2023 Bootloaders (for latest hardware support) or ADK Bootloaders (for better compatibility with older hardware)
  - NOTE, if you use the latest version of 2PXE from 2Pint Software, you don't need to do this, 2PXE itself will figure out the correct bootloader and use it.  Pretty Nice!
+26.08.17  : Removed $Use2023BootLoaders, as it was causing more issues than resolving for people using 2PXE which does it automatically.
 
 .LINK
 https://2pintsoftware.com
@@ -72,7 +73,7 @@ $AddDellProvider = $false
 $AddHPCMSL = $false
 $Add7Zip = $false
 $AddOSDModule = $false
-$Use2023BootLoaders = $false
+
 
 
 
