@@ -14,7 +14,7 @@ Optionally: A copy of an installed StifleR Client folder (2.10 or 3.0)
 .NOTES
 AUTHOR: 2Pint Software
 EMAIL: support@2pintsoftware.com (or reach out to Gary Blok)
-VERSION: 23.10.01
+VERSION: 26.08.17
 DATE:10/01/2023 
 
 CHANGE LOG: 
